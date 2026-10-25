@@ -4,7 +4,7 @@
 import { getGoals, saveGoals, getVictories, saveVictories, goalProgress, isReached, newId } from "../goals.js";
 import { getAllExercises, getWorkouts, getMeasurements, getPlan } from "../store.js";
 import { weeklySummary } from "../stats.js";
-import { getUnits, unitFor, toKg, fromKg, setsInUnit, formatNumber } from "../units.js";
+import { getUnits, unitFor, toKg, fromKg, setsInUnit, formatNumber, isPerSide, weightLabel } from "../units.js";
 import { BODY_METRICS } from "../data/catalog.js";
 import { formatSets } from "./session.js";
 import { bestMarks } from "../records.js";
@@ -35,7 +35,7 @@ export function goalTitle(goal, { exercises, units }) {
   if (goal.type === "strength") {
     const ex = exercises.find((e) => e.id === goal.exerciseId);
     const unit = unitFor(units, goal.exerciseId);
-    const target = formatSets([{ weight: fromKg(goal.weight, unit), reps: goal.reps }], ex, unit);
+    const target = formatSets([{ weight: fromKg(goal.weight, unit), reps: goal.reps }], ex, weightLabel(unit, isPerSide(units, ex)));
     return `${ex?.name || t("common.deletedExercise")}: ${target}`;
   }
   if (goal.type === "consistency") return t("goal.consistencyTitle", { n: goal.weeks });

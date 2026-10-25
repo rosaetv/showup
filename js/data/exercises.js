@@ -669,7 +669,7 @@ export const EXERCISES = [
     tip: "El movimiento es corto: sube la cadera con el abdomen, no con impulso.",
   },
   {
-    id: "chinnies", name: "Chinnies", equipment: "peso_corporal", pattern: "core",
+    id: "chinnies", name: "Cross crunches", equipment: "peso_corporal", pattern: "core",
     primary: ["oblicuos", "abdomen"], secondary: [],
     description: "Boca arriba, crunch llevando la rodilla doblada hacia el codo contrario y alternando.",
     steps: ["Boca arriba, manos suaves detrás de las orejas, una pierna doblada y la otra estirada.", "Haz un crunch y acerca la rodilla doblada al codo contrario.", "Cambia de lado y sigue alternando."],
@@ -805,6 +805,14 @@ export const EXERCISES = [
     description: "Sostenerse sobre una pierna, con la rodilla ligeramente flexionada.",
     steps: ["De pie junto a una pared o un apoyo, por si lo necesitas.", "Levanta un pie y mantén el equilibrio sobre la otra pierna.", "Cuando sea fácil, prueba con los ojos cerrados o sobre un cojín. Cambia de pierna."],
     tip: "Es lo que más ayuda a que el tobillo no se vuelva a doblar. Si duele o se siente inestable, apóyate.",
+  },
+
+  {
+    id: "plie-releve", name: "Plié con relevé", equipment: "peso_corporal", pattern: "ankle",
+    primary: ["pantorrillas"], secondary: ["tibial", "cuadriceps", "gluteos"],
+    description: "Paso de baile: en plié, subir los talones sin subir de altura, estirar las rodillas, sostener y bajar lento.",
+    steps: ["De pie con los pies un poco abiertos hacia afuera, baja a plié doblando las rodillas.", "Sin subir de altura, despega los talones del suelo (relevé).", "Estira las rodillas quedando en puntas, sostén 2–3 segundos y baja los talones despacio."],
+    tip: "Las rodillas apuntan hacia donde miran los pies. Apóyate en una pared o barra si lo necesitas; si el tobillo duele, para.",
   },
 
   // ---------- Banda elástica ----------

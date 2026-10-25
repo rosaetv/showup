@@ -5,7 +5,7 @@ import { suggestNext } from "../progression.js";
 import { bestMarks } from "../records.js";
 import { lineChart, bindCharts } from "../chart.js";
 import { formatSets, suggestionIcon } from "./session.js";
-import { getUnits, setExerciseUnit, unitFor, setsInUnit, formatNumber, unitToggle } from "../units.js";
+import { getUnits, setExerciseUnit, unitFor, setsInUnit, formatNumber, unitToggle, isPerSide, weightLabel } from "../units.js";
 import { PATTERNS } from "../data/catalog.js";
 import { findAlternatives } from "../generator.js";
 import { editNote } from "./day.js";
@@ -135,7 +135,10 @@ export async function renderExercise(view, id) {
 // ---------- Progreso ----------
 
 async function progressSection(exercise) {
-  const weightUnit = unitFor(await getUnits(), exercise.id);
+  const units = await getUnits();
+  const weightUnit = unitFor(units, exercise.id);
+  const perSide = isPerSide(units, exercise);
+  const label = weightLabel(weightUnit, perSide); // "kg" o "kg por lado"
   const title = `
     <div class="title-row section-row">
       <h2 class="section-title">${t("exercise.progress")}</h2>
@@ -154,7 +157,7 @@ async function progressSection(exercise) {
   const planItem = plan?.days.flatMap((d) => d.items).find((i) => i.exerciseId === exercise.id);
   const last = history.at(-1);
   const range = planItem || { repMin: last.repMin, repMax: last.repMax, sets: last.sets.length };
-  const suggestion = suggestNext(exercise, last, range, weightUnit);
+  const suggestion = suggestNext(exercise, last, range, weightUnit, perSide);
 
   // Si nunca usó peso, se grafica el máximo de repeticiones (o segundos).
   const usesWeight = history.some((h) => h.sets.some((s) => s.weight > 0));
@@ -163,17 +166,17 @@ async function progressSection(exercise) {
     y: usesWeight ? Math.max(...h.sets.map((s) => s.weight)) : Math.max(...h.sets.map((s) => s.reps)),
     label: shortDate(h.date),
   }));
-  const format = usesWeight ? (v) => `${formatNumber(v)} ${weightUnit}` : (v) => `${Math.round(v)} ${unit}`;
+  const format = usesWeight ? (v) => `${formatNumber(v)} ${label}` : (v) => `${Math.round(v)} ${unit}`;
 
   // Récords (no aplican a ejercicios asistidos: ahí menos peso es más difícil).
   const best = exercise.assisted ? null : bestMarks(history);
-  const mark = (set) => formatSets([set], exercise, weightUnit);
+  const mark = (set) => formatSets([set], exercise, label);
   const records = best
     ? `
     <h2 class="section-title">${t("record.title")}</h2>
     <section class="card records-card">
       ${usesWeight
-        ? `<div><strong>${formatNumber(best.heaviest.weight)} ${weightUnit}</strong><small>${t("record.heaviest", { reps: best.heaviest.reps, date: shortDate(best.heaviest.date) })}</small></div>`
+        ? `<div><strong>${formatNumber(best.heaviest.weight)} ${label}</strong><small>${t("record.heaviest", { reps: best.heaviest.reps, date: shortDate(best.heaviest.date) })}</small></div>`
         : ""}
       <div><strong>${exercise.timed ? `${best.mostReps.reps} s` : t("record.reps", { n: best.mostReps.reps })}</strong><small>${usesWeight ? t("record.mostRepsWith", { set: mark(best.mostReps), date: shortDate(best.mostReps.date) }) : t("record.mostReps", { date: shortDate(best.mostReps.date) })}</small></div>
     </section>`
@@ -187,7 +190,7 @@ async function progressSection(exercise) {
       <p class="eyebrow">${t("exercise.nextTime")}</p>
       <p class="suggestion suggestion-${suggestion.kind}">${suggestionIcon(suggestion.kind)}<span>${suggestion.text}</span></p>
       ${suggestion.reason ? `<p class="why">${t(`prog.why.${suggestion.reason}`)}</p>` : ""}
-      <p class="muted no-margin">${t("exercise.target")} ${formatSets(suggestion.reps.map((reps) => ({ weight: suggestion.weight, reps })), exercise, weightUnit)}</p>
+      <p class="muted no-margin">${t("exercise.target")} ${formatSets(suggestion.reps.map((reps) => ({ weight: suggestion.weight, reps })), exercise, label)}</p>
     </section>` : ""}
     <section class="card chart-card">
       <p class="chart-title">${usesWeight ? t("exercise.chartWeight") : exercise.timed ? t("exercise.chartTime") : t("exercise.chartReps")}</p>
@@ -201,7 +204,7 @@ async function progressSection(exercise) {
           (h) => `
         <a class="list-row" href="#/historial/${h.workoutId}">
           <span class="list-row-text">
-            <strong>${formatSets(h.sets, exercise, weightUnit)}</strong>
+            <strong>${formatSets(h.sets, exercise, label)}</strong>
             <small>${longDate(h.date)}</small>
           </span>
         </a>`

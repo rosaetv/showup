@@ -16,7 +16,7 @@ import { getDeload, isDeloadActive, deloadSets } from "../deload.js";
 import { t } from "../i18n.js";
 import { chooseAlternative, editNote } from "./day.js";
 import { esc, icons, closingHeader, formatDose, formatRest, openSheet, confirmSheet, toast, dayLabel, workoutDayLabel } from "../ui.js";
-import { getUnits, setExerciseUnit, unitFor, toKg, fromKg, setsInUnit, formatNumber, unitToggle } from "../units.js";
+import { getUnits, setExerciseUnit, unitFor, toKg, fromKg, setsInUnit, formatNumber, unitToggle, canBePerSide, isPerSide, setPerSide, weightLabel } from "../units.js";
 
 // ---------- Empezar ----------
 
@@ -118,6 +118,7 @@ export async function renderSession(view) {
   const exercises = await getAllExercises();
   const byId = (id) => exercises.find((e) => e.id === id);
   let notes = await getNotes();
+  let units = await getUnits();
   const last = {};
   const bests = {}; // récords anteriores de cada ejercicio (en kg)
   const loadLast = async () => {
@@ -135,7 +136,7 @@ export async function renderSession(view) {
 
   const draw = () => {
     const y = window.scrollY;
-    view.innerHTML = template(active, byId, last, notes, bests);
+    view.innerHTML = template(active, byId, last, notes, bests, units);
     window.scrollTo(0, y);
     updateHeader();
   };
@@ -186,6 +187,13 @@ export async function renderSession(view) {
       // Tocar la opción marcada la quita.
       entry.effort = entry.effort === target.dataset.value ? undefined : target.dataset.value;
       await save();
+      draw();
+    } else if (action === "side") {
+      const perSide = target.dataset.value === "side";
+      if (perSide === isPerSide(units, byId(entry.exerciseId))) return;
+      await setPerSide(entry.exerciseId, perSide);
+      units = await getUnits();
+      toast(t("units.sideChanged"));
       draw();
     } else if (action === "unit") {
       const from = entry.unit || "kg";
@@ -239,7 +247,7 @@ export async function renderSession(view) {
   };
 }
 
-function template(active, byId, last, notes, bests) {
+function template(active, byId, last, notes, bests, units) {
   const total = active.exercises.reduce((n, e) => n + e.sets.length, 0);
   const done = active.exercises.reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0);
 
@@ -253,10 +261,12 @@ function template(active, byId, last, notes, bests) {
     .map((entry, ei) => {
       const ex = byId(entry.exerciseId) || { id: entry.exerciseId, name: t("common.deletedExercise"), equipment: "", primary: [], secondary: [] };
       const unit = entry.unit || "kg";
+      const perSide = isPerSide(units, ex);
+      const label = weightLabel(unit, perSide); // "kg" o "kg por lado"
       const stored = last[entry.exerciseId];
       const previous = stored ? { ...stored, sets: setsInUnit(stored.sets, unit) } : null;
       const range = { repMin: entry.repMin, repMax: entry.repMax, sets: entry.plannedSets || entry.sets.length };
-      const suggestion = entry.seconds ? null : active.deload ? deloadSuggestion(ex, previous, range, unit) : suggestNext(ex, previous, range, unit);
+      const suggestion = entry.seconds ? null : active.deload ? deloadSuggestion(ex, previous, range, unit, perSide) : suggestNext(ex, previous, range, unit, perSide);
       const note = notes[ex.id];
       const bodyweight = ex.equipment === "peso_corporal";
       const allDone = entry.sets.every((s) => s.done);
@@ -289,11 +299,12 @@ function template(active, byId, last, notes, bests) {
             <button class="icon-btn ${note ? "has-note" : ""}" data-action="note" data-ex="${ei}" aria-label="${t("note.label")}">${icons.pencil}</button>
           </div>
           <p class="ex-dose">${entry.seconds ? t("core.dose", { rounds: entry.sets.length, seconds: entry.seconds }) : formatDose({ ...entry, sets: entry.sets.length }, ex, targetReps(entry, suggestion), !entry.group)}</p>
-          ${entry.seconds ? "" : `<p class="last">${previous ? `<strong>${t("session.lastTime")}</strong> ${formatSets(previous.sets, ex, unit)}` : t("session.firstTime")}</p>`}
+          ${entry.seconds ? "" : `<p class="last">${previous ? `<strong>${t("session.lastTime")}</strong> ${formatSets(previous.sets, ex, label)}` : t("session.firstTime")}</p>`}
           ${suggestion ? `<p class="suggestion suggestion-${suggestion.kind}">${suggestionIcon(suggestion.kind)}<span>${esc(suggestion.text)}</span></p>` : ""}
           ${suggestion?.reason ? `<p class="why">${t(`prog.why.${suggestion.reason}`)}</p>` : ""}
-          ${recordLine(entryRecord(entry, ex, bests[entry.exerciseId]), ex, unit)}
+          ${recordLine(entryRecord(entry, ex, bests[entry.exerciseId]), ex, unit, label)}
           ${note ? `<p class="ex-note" data-action="note" data-ex="${ei}">${esc(note)}</p>` : ""}
+          ${canBePerSide(ex) && !entry.seconds ? sideToggle(perSide, ei) : ""}
           <div class="sets">
             <div class="set-row set-head">
               <span>${t("session.set")}</span>${unitToggle(unit, "unit", `data-ex="${ei}"`)}<span>${ex.timed || entry.seconds ? t("session.sec") : t("session.reps")}</span><span></span>
@@ -500,10 +511,22 @@ function entryRecord(entry, exercise, best) {
   return sessionRecord(exercise, sets, best);
 }
 
-function recordLine(record, exercise, unit) {
+function recordLine(record, exercise, unit, label = unit) {
   if (!record) return "";
-  const format = (set) => formatSets(setsInUnit([set], unit), exercise, unit);
+  const format = (set) => formatSets(setsInUnit([set], unit), exercise, label);
   return `<p class="pr-line" role="status">${TROPHY}<span>${t("record.new", { now: format(record.set), before: format(record.previous) })}</span></p>`;
+}
+
+// Barra y Smith: ¿el peso que anotas es lo de un lado o el total?
+function sideToggle(perSide, ei) {
+  return `
+    <div class="side-row">
+      <span>${perSide ? t("units.sideHint") : t("units.totalHint")}</span>
+      <span class="unit-toggle" role="group" aria-label="${t("units.sideLabel")}">
+        <button type="button" data-action="side" data-ex="${ei}" data-value="side" aria-pressed="${perSide}">${t("units.side")}</button>
+        <button type="button" data-action="side" data-ex="${ei}" data-value="total" aria-pressed="${!perSide}">${t("units.total")}</button>
+      </span>
+    </div>`;
 }
 
 function effortPicker(entry, ei) {

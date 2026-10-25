@@ -7,7 +7,7 @@
 // El respaldo JSON (Perfil → Sobre la app) sigue siendo aparte.
 
 import { getPlan, getAllExercises, getWorkouts, getMeasurements, getLastPerformance, getNotes } from "./store.js";
-import { getUnits, unitFor, fromKg, formatNumber } from "./units.js";
+import { getUnits, unitFor, fromKg, formatNumber, isPerSide } from "./units.js";
 import { BODY_METRICS, DAY_TEMPLATES } from "./data/catalog.js";
 import { EXERCISES } from "./data/exercises.js";
 import { tIn } from "./i18n.js";
@@ -53,14 +53,17 @@ export async function routineText({ allTime = false, body = false } = {}) {
     const ex = byId(id);
     if (!(kg > 0)) return noWeight(ex) ? t(`export.noWeight.${ex.equipment}`) : "—";
     const unit = unitFor(units, id);
-    return `${formatNumber(fromKg(kg, unit))} ${unit}`;
+    return `${formatNumber(fromKg(kg, unit))} ${unit}${isPerSide(units, ex) ? ` ${t("export.perSide")}` : ""}`;
   };
   // Series como "12×10, 11×10" (reps × peso); sin peso, solo las repeticiones.
   const setsText = (sets, id, circuit = false) => {
     const unit = unitFor(units, id);
     const suffix = byId(id)?.timed || circuit ? " s" : "";
     const text = sets.map((s) => (s.weight > 0 ? `${s.reps}${suffix}×${formatNumber(fromKg(s.weight, unit))}` : `${s.reps}${suffix}`)).join(", ");
-    return sets.some((s) => s.weight > 0) && unit !== "kg" ? `${text} (${unit})` : text;
+    if (!sets.some((s) => s.weight > 0)) return text;
+    const perSide = isPerSide(units, byId(id));
+    if (perSide) return `${text} (${unit} ${t("export.perSide")})`;
+    return unit !== "kg" ? `${text} (${unit})` : text;
   };
 
   const lines = [`# ${t("export.title")}`];
@@ -68,6 +71,9 @@ export async function routineText({ allTime = false, body = false } = {}) {
     [t("export.exported", { date: isoDate(Date.now()) }), plan && t("export.frequency", { n: plan.daysPerWeek, minutes: plan.minutes })].filter(Boolean).join(" · "),
     ""
   );
+  // Si hay ejercicios de barra anotados por lado, se aclara para quien lea el archivo.
+  const ids = new Set([...(plan?.days || []).flatMap((d) => d.items.map((i) => i.exerciseId)), ...workouts.flatMap((w) => w.exercises.map((e) => e.exerciseId))]);
+  if ([...ids].some((id) => isPerSide(units, byId(id)))) lines.push(`> ${t("export.perSideNote")}`, "");
 
   // ---------- Plan actual ----------
   lines.push(`## ${t("export.plan")}`);

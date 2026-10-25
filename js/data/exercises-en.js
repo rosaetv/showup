@@ -362,7 +362,7 @@ export const EXERCISES_EN = {
   "crunch-inverso": ex("Reverse crunch", "On your back, bring your knees to your chest, lifting your hips slightly off the floor.",
     ["On your back, knees bent at 90° in the air.", "Bring your knees to your chest, lifting your hips off the floor.", "Lower slowly without dropping your legs."],
     "It's a short move: lift your hips with your abs, not momentum."),
-  "chinnies": ex("Chinnies", "On your back, crunch bringing your bent knee toward the opposite elbow, alternating.",
+  "chinnies": ex("Cross crunches", "On your back, crunch bringing your bent knee toward the opposite elbow, alternating.",
     ["On your back, hands lightly behind your ears, one leg bent and the other straight.", "Crunch up and bring the bent knee toward the opposite elbow.", "Switch sides and keep alternating."],
     "Don't pull your head with your hands: your abs do the lifting."),
   "crunch-bicicleta": ex("Bicycle crunch", "On your back, pedal in the air bringing each elbow toward the opposite knee.",
@@ -410,4 +410,7 @@ export const EXERCISES_EN = {
   "mountain-climbers": ex("Mountain climbers", "In a high plank, bring your knees to your chest, alternating.",
     ["High plank on your hands.", "Bring one knee to your chest and back.", "Alternate legs at a pace you can control."],
     "Go slow if your ankle bothers you: it still counts."),
+  "plie-releve": ex("Plié with relevé", "A dance move: in plié, lift your heels without rising, straighten your knees, hold and lower slowly.",
+    ["Stand with feet slightly turned out and bend your knees into a plié.", "Without rising, lift your heels off the floor (relevé).", "Straighten your knees to finish on your toes, hold 2–3 seconds and lower your heels slowly."],
+    "Knees point where your toes point. Hold a wall or bar if you need to; if your ankle hurts, stop."),
 };

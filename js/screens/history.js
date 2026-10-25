@@ -2,7 +2,7 @@
 
 import { getWorkouts, getWorkout, deleteWorkout, getAllExercises } from "../store.js";
 import { formatSets } from "./session.js";
-import { getUnits, unitFor, setsInUnit } from "../units.js";
+import { getUnits, unitFor, setsInUnit, isPerSide, weightLabel } from "../units.js";
 import { esc, icons, header, pageHeader, confirmSheet, toast, workoutDayLabel } from "../ui.js";
 import { t, locale } from "../i18n.js";
 
@@ -79,7 +79,7 @@ export async function renderWorkout(view, id) {
         ${ex ? `<a class="ex-name" href="#/ejercicio/${ex.id}">${esc(ex.name)}</a>` : `<p class="ex-name">${esc(e.name)}</p>`}
         ${e.record || e.effort ? `<p class="logged-tags">${e.record ? `<span class="pr-badge">${TROPHY}${t("record.badge")}</span>` : ""}${e.effort ? `<span class="tag">${t(`effort.${e.effort}`)}</span>` : ""}</p>` : ""}
         <div class="logged-sets">
-          ${setsInUnit(e.sets, unitFor(units, e.exerciseId)).map((s, i) => `<span><small>${i + 1}</small>${formatSets([s], e.circuit ? { ...ex, timed: true } : ex, unitFor(units, e.exerciseId))}</span>`).join("")}
+          ${setsInUnit(e.sets, unitFor(units, e.exerciseId)).map((s, i) => `<span><small>${i + 1}</small>${formatSets([s], e.circuit ? { ...ex, timed: true } : ex, weightLabel(unitFor(units, e.exerciseId), isPerSide(units, ex)))}</span>`).join("")}
         </div>
       </article>`;
       })

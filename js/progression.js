@@ -3,7 +3,7 @@
 // 2. Cuando lo logras, sube el peso y vuelve al mínimo del rango.
 
 import { t } from "./i18n.js";
-import { formatNumber } from "./units.js";
+import { formatNumber, weightLabel } from "./units.js";
 
 // Cuánto subir según el equipo, en cada unidad.
 const INCREMENTS = {
@@ -15,22 +15,23 @@ const INCREMENTS = {
  * exercise: ejercicio de la biblioteca
  * last: { sets: [{ weight, reps }], effort } de la última sesión (o null), con el peso YA en `unit`
  *   effort (opcional): "easy" | "ok" | "hard", cómo se sintió
-
  * range: { repMin, repMax, sets } objetivo actual
  * unit: "kg" o "lb"; el peso sugerido se devuelve en esa unidad
  * Devuelve { kind, weight, reps: [por serie], text, reason } o null si no hay historial.
  *   kind: "up" (sube peso), "reps" (sube repeticiones), "down" (baja peso), "top" (tope sin peso),
  *         "same" (repetir lo mismo porque se sintió pesado)
  *   reason: "hard" | "easy" si la sugerencia cambió por el esfuerzo marcado
+ * perSide: true si el peso se anota por lado de la barra (sube la mitad de cada lado)
  */
-export function suggestNext(exercise, last, range, unit = "kg") {
+export function suggestNext(exercise, last, range, unit = "kg", perSide = false) {
   if (!last?.sets.length) return null;
   const { repMin, repMax } = range;
   const plannedSets = range.sets || last.sets.length;
   const assisted = Boolean(exercise.assisted); // más peso = más ayuda
-  const step = INCREMENTS[unit][exercise.equipment] ?? INCREMENTS[unit].barra;
+  const fullStep = INCREMENTS[unit][exercise.equipment] ?? INCREMENTS[unit].barra;
+  const step = perSide ? fullStep / 2 : fullStep;
   const round = unit === "lb" ? (n) => Math.round(n * 2) / 2 : (n) => Math.round(n * 4) / 4;
-  const w = (n) => `${formatNumber(n)} ${unit}`;
+  const w = (n) => `${formatNumber(n)} ${weightLabel(unit, perSide)}`;
   const timedStep = 5; // segundos
 
   // Peso de trabajo: el más usado en la sesión (o el más alto si hay empate).
@@ -131,7 +132,7 @@ function workingWeight(sets, assisted) {
  * Sugerencia durante la semana de descarga: ~10% menos de peso y la meta mínima.
  * last: la última sesión normal (la descarga no cuenta para la progresión).
  */
-export function deloadSuggestion(exercise, last, range, unit = "kg") {
+export function deloadSuggestion(exercise, last, range, unit = "kg", perSide = false) {
   const reps = Array(range.sets).fill(range.repMin);
   if (!last?.sets.length) return { kind: "deload", weight: 0, reps, text: t("prog.deloadFirst") };
   const weight = workingWeight(last.sets, Boolean(exercise.assisted));
@@ -142,7 +143,7 @@ export function deloadSuggestion(exercise, last, range, unit = "kg") {
     kind: "deload",
     weight: next,
     reps,
-    text: next ? t("prog.deload", { weight: `${formatNumber(next)} ${unit}` }) : t("prog.deloadNoWeight"),
+    text: next ? t("prog.deload", { weight: `${formatNumber(next)} ${weightLabel(unit, perSide)}` }) : t("prog.deloadNoWeight"),
   };
 }
 

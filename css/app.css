@@ -2461,3 +2461,23 @@ body.has-resume-bar .bottom-bar.above-tabs {
   width: 16px;
   height: 16px;
 }
+
+/* ---------- Peso por lado (barra) ---------- */
+
+.side-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.side-row .unit-toggle {
+  flex: none;
+}
+
+.side-row .unit-toggle button {
+  white-space: nowrap;
+}

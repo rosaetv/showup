@@ -25,6 +25,27 @@ export async function setDefaultUnit(unit) {
 
 export const unitFor = (units, exerciseId) => units.byExercise[exerciseId] || units.default || "kg";
 
+// ---------- Peso por lado (barra y Smith) ----------
+// En barra es más fácil anotar lo que pones de cada lado (5 kg + 5 kg → "5").
+// Por defecto se anota por lado; se puede cambiar por ejercicio a "total".
+// El número se guarda tal cual lo anotas: la app solo cambia cómo lo explica
+// y cuánto sugiere subir (la mitad, porque se sube de cada lado).
+
+const PER_SIDE_EQUIPMENT = new Set(["barra", "smith"]);
+
+export const canBePerSide = (exercise) => PER_SIDE_EQUIPMENT.has(exercise?.equipment);
+
+export const isPerSide = (units, exercise) => canBePerSide(exercise) && (units.perSide?.[exercise.id] ?? true);
+
+export async function setPerSide(exerciseId, perSide) {
+  const units = await getUnits();
+  units.perSide = { ...(units.perSide || {}), [exerciseId]: perSide };
+  await db.put("kv", units, "units");
+}
+
+// "kg" o "kg por lado"
+export const weightLabel = (unit, perSide) => (perSide ? t("units.perSide", { unit }) : unit);
+
 // De la unidad mostrada a kg (para guardar).
 export const toKg = (value, unit) => (unit === "lb" ? value * KG_PER_LB : value);
 
