@@ -2481,3 +2481,15 @@ body.has-resume-bar .bottom-bar.above-tabs {
 .side-row .unit-toggle button {
   white-space: nowrap;
 }
+
+/* ---------- Ejercicio agregado solo por hoy ---------- */
+
+.tag-today {
+  width: max-content;
+  background: var(--tint-2);
+  color: var(--color-text);
+}
+
+.add-list {
+  margin-top: var(--space-3);
+}

@@ -2,7 +2,7 @@
 
 import {
   getActiveWorkout, saveActiveWorkout, clearActiveWorkout, saveWorkout, getWorkouts,
-  getLastPerformance, getExerciseHistory, getAllExercises, getNotes, getPlan, savePlan, getProfile,
+  getLastPerformance, getExerciseHistory, getAllExercises, getNotes, getPlan, savePlan, getProfile, getFavorites,
 } from "../store.js";
 import { getPeriods, activePeriod } from "../period.js";
 import { blocks, pairRest } from "../supersets.js";
@@ -15,7 +15,7 @@ import { suggestNext, targetReps, deloadSuggestion } from "../progression.js";
 import { getDeload, isDeloadActive, deloadSets } from "../deload.js";
 import { t } from "../i18n.js";
 import { chooseAlternative, editNote } from "./day.js";
-import { esc, icons, closingHeader, formatDose, formatRest, openSheet, confirmSheet, toast, dayLabel, workoutDayLabel } from "../ui.js";
+import { esc, icons, closingHeader, formatDose, formatRest, openSheet, confirmSheet, toast, dayLabel, workoutDayLabel, equipmentName, muscleName } from "../ui.js";
 import { getUnits, setExerciseUnit, unitFor, toKg, fromKg, setsInUnit, formatNumber, unitToggle, canBePerSide, isPerSide, setPerSide, weightLabel } from "../units.js";
 
 // ---------- Empezar ----------
@@ -221,6 +221,30 @@ export async function renderSession(view) {
         notes = await getNotes();
         draw();
       });
+    } else if (action === "add-exercise") {
+      addExerciseSheet(exercises, active, async (exercise) => {
+        const item = makeItem(exercise, active.goal, active.exercises.length, (await getPlan()) || {});
+        active.exercises.push({
+          exerciseId: exercise.id,
+          repMin: item.repMin,
+          repMax: item.repMax,
+          rest: item.rest,
+          added: true, // solo para este entrenamiento: no cambia tu rutina
+          plannedSets: item.sets,
+          unit: unitFor(await getUnits(), exercise.id),
+          sets: Array.from({ length: item.sets }, emptySet),
+        });
+        await save();
+        await loadLast();
+        draw();
+        toast(t("session.addedToday", { name: exercise.name }));
+        // Lleva la vista al ejercicio nuevo.
+        view.querySelectorAll(".ex-card")[active.exercises.length - 1]?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    } else if (action === "remove-exercise") {
+      active.exercises.splice(ei, 1);
+      await save();
+      draw();
     } else if (action === "swap") {
       const plan = await getPlan();
       chooseAlternative(byId(entry.exerciseId), exercises, plan?.excludedEquipment || [], plan?.care || [], (chosen) =>
@@ -298,6 +322,7 @@ function template(active, byId, last, notes, bests, units) {
             <a class="ex-name" href="#/ejercicio/${ex.id}"><span class="ex-index ${entry.group ? "pair" : ""}">${labels[ei]}</span>${esc(ex.name)}</a>
             <button class="icon-btn ${note ? "has-note" : ""}" data-action="note" data-ex="${ei}" aria-label="${t("note.label")}">${icons.pencil}</button>
           </div>
+          ${entry.added ? `<span class="tag tag-today">${t("session.todayOnly")}</span>` : ""}
           <p class="ex-dose">${entry.seconds ? t("core.dose", { rounds: entry.sets.length, seconds: entry.seconds }) : formatDose({ ...entry, sets: entry.sets.length }, ex, targetReps(entry, suggestion), !entry.group)}</p>
           ${entry.seconds ? "" : `<p class="last">${previous ? `<strong>${t("session.lastTime")}</strong> ${formatSets(previous.sets, ex, label)}` : t("session.firstTime")}</p>`}
           ${suggestion ? `<p class="suggestion suggestion-${suggestion.kind}">${suggestionIcon(suggestion.kind)}<span>${esc(suggestion.text)}</span></p>` : ""}
@@ -316,6 +341,7 @@ function template(active, byId, last, notes, bests, units) {
             <button class="btn-small" data-action="add-set" data-ex="${ei}">${icons.plus} ${t("session.set")}</button>
             ${entry.sets.length > 1 && !entry.sets.at(-1).done ? `<button class="btn-small" data-action="remove-set" data-ex="${ei}" aria-label="${t("session.removeSet")}">− ${t("session.set")}</button>` : ""}
             <button class="btn-small" data-action="swap" data-ex="${ei}">${icons.swap} ${t("common.swap")}</button>
+            ${entry.added && !entry.sets.some((x) => x.done) ? `<button class="btn-small" data-action="remove-exercise" data-ex="${ei}">${t("session.removeToday")}</button>` : ""}
           </div>
         </article>`;
     });
@@ -354,6 +380,7 @@ function template(active, byId, last, notes, bests, units) {
     </div>
     ${active.period ? `<p class="period-note">${t("period.sessionNote")}</p>` : ""}
     ${cards}
+    ${active.extra ? "" : `<button class="btn btn-secondary btn-spaced" data-action="add-exercise">${icons.plus} ${t("session.addToday")}</button>`}
     <button class="btn btn-ghost-danger btn-spaced" data-action="discard">${t("session.discard")}</button>
     <div class="bottom-bar">
       <button class="btn btn-primary" data-action="finish">${t("session.finish")}</button>
@@ -376,6 +403,7 @@ function swapExercise(active, ei, chosen, plan, onDone) {
       rest: item.rest,
       ...(entry.group && { group: entry.group }),
       ...(entry.finisher && { finisher: true }),
+      ...(entry.added && { added: true }),
       plannedSets: entry.finisher ? entry.plannedSets : item.sets,
       unit: unitFor(await getUnits(), chosen.id),
       sets: entry.sets.map(emptySet),
@@ -393,6 +421,8 @@ function swapExercise(active, ei, chosen, plan, onDone) {
     toast(alsoInPlan ? t("session.swappedPlan") : t("session.swappedToday"));
     await onDone();
   };
+
+  if (entry.added) return apply(false); // un ejercicio agregado hoy no está en tu rutina
 
   const close = openSheet({
     title: t("session.swapTitle", { name: chosen.name }),
@@ -466,6 +496,7 @@ async function finish(active, byId) {
           .map((s) => ({ weight: Math.round(toKg(toNumber(s.weight) || 0, e.unit || "kg") * 10000) / 10000, reps: toNumber(s.reps) })),
         ...(e.effort && { effort: e.effort }),
         ...(e.seconds && { circuit: true }),
+        ...(e.added && { added: true }),
         ...(records.has(e) && { record: true }),
       }))
       .filter((e) => e.sets.length),
@@ -494,6 +525,49 @@ function asWorkout(active) {
       sets: e.sets.filter((s) => s.done).map((s) => ({ weight: toKg(toNumber(s.weight) || 0, e.unit || "kg"), reps: toNumber(s.reps) })),
     })),
   };
+}
+
+// ---------- Agregar un ejercicio solo por hoy ----------
+
+async function addExerciseSheet(exercises, active, onChoose) {
+  const favorites = await getFavorites();
+  const inWorkout = new Set(active.exercises.map((e) => e.exerciseId));
+  const normalize = (text) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  // Tus favoritos primero; los que no te gustan, al final.
+  const rank = (e) => (favorites.exercises.includes(e.id) ? 0 : favorites.disliked.includes(e.id) ? 2 : 1);
+  const list = (query) =>
+    exercises
+      .filter((e) => !inWorkout.has(e.id) && (!query || normalize(`${e.name} ${e.primary.map(muscleName).join(" ")}`).includes(normalize(query))))
+      .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
+      .slice(0, 40)
+      .map(
+        (e) => `
+        <button class="list-row" data-choose="${e.id}">
+          <span class="list-row-text">
+            <strong>${favorites.exercises.includes(e.id) ? "⭐ " : ""}${esc(e.name)}</strong>
+            <small>${favorites.disliked.includes(e.id) ? `${t("exercise.dislikedShort")} · ` : ""}${equipmentName(e.equipment)} · ${e.primary.map(muscleName).join(", ")}</small>
+          </span>
+        </button>`
+      )
+      .join("") || `<p class="muted small-note">${t("session.addNone")}</p>`;
+
+  const close = openSheet({
+    title: t("session.addToday"),
+    body: `
+      <p class="sheet-text">${t("session.addTodayText")}</p>
+      <label class="search">${icons.search}<input class="input" type="search" placeholder="${t("library.search")}" /></label>
+      <div class="list add-list">${list("")}</div>`,
+    onMount: (sheet) => {
+      const results = sheet.querySelector(".add-list");
+      sheet.querySelector("input").addEventListener("input", (event) => (results.innerHTML = list(event.target.value.trim())));
+      results.addEventListener("click", (event) => {
+        const row = event.target.closest("[data-choose]");
+        if (!row) return;
+        close();
+        onChoose(exercises.find((e) => e.id === row.dataset.choose));
+      });
+    },
+  });
 }
 
 // ---------- Récords y esfuerzo ----------

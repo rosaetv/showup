@@ -109,7 +109,7 @@ export async function routineText({ allTime = false, body = false } = {}) {
       w.exercises.map((e) => [
         isoDate(w.finishedAt),
         dayLabel({ template: w.dayTemplate, suffix: w.daySuffix, name: w.dayName }),
-        nameOf(e.exerciseId, e.name),
+        `${nameOf(e.exerciseId, e.name)}${e.added ? ` (${t("export.addedToday")})` : ""}`,
         setsText(e.sets, e.exerciseId, e.circuit),
       ])
     );

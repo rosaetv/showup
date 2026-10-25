@@ -6,7 +6,7 @@
 // - Si agregas un archivo nuevo a la app, súmalo a FILES.
 //   (dev/revisar-sw.py avisa si falta alguno).
 
-const VERSION = "1.0.23";
+const VERSION = "1.0.24";
 const CACHE = `show-up-${VERSION}`;
 const FONT_CACHE = "show-up-fonts";
 
