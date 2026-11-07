@@ -5,21 +5,25 @@ import { db } from "../db.js";
 import { getAllExercises, getFavorites, toggleFavoriteExercise, toggleDislikedExercise } from "../store.js";
 import { CORE_DIY_GROUPS, CORE_DIY_DEFAULTS, CORE_DIY_MAX } from "../data/core-diy.js";
 import { startCoreCircuit } from "./session.js";
-import { esc, icons, header, muscleName, openSheet, toast } from "../ui.js";
+import { esc, icons, header, muscleName, equipmentName, openSheet, toast } from "../ui.js";
 import { t } from "../i18n.js";
 
 const getChoice = async () => ({ ...CORE_DIY_DEFAULTS, ...((await db.get("kv", "coreDiy")) || {}) });
 const saveChoice = (choice) => db.put("kv", choice, "coreDiy");
 
 // Uno al azar de cada grupo (tus favoritos primero; nunca los que no te gustan).
+// Los que llevan equipo solo se sugieren si son favoritos: la sugerencia se puede hacer solo con el mat.
 function suggestFive(exercises, favorites) {
   return Object.values(CORE_DIY_GROUPS).map((ids) => {
-    const available = ids.filter((id) => exercises.some((e) => e.id === id && !e.advanced) && !favorites.disliked.includes(id));
-    const favs = available.filter((id) => favorites.exercises.includes(id));
+    const usable = ids.filter((id) => exercises.some((e) => e.id === id && !e.advanced) && !favorites.disliked.includes(id));
+    const favs = usable.filter((id) => favorites.exercises.includes(id));
+    const available = usable.filter((id) => byEquipment(exercises, id) === "peso_corporal");
     const pool = favs.length ? favs : available.length ? available : ids;
     return pool[Math.floor(Math.random() * pool.length)];
   });
 }
+
+const byEquipment = (exercises, id) => exercises.find((e) => e.id === id)?.equipment;
 
 export async function renderCore(view) {
   const exercises = await getAllExercises();
@@ -79,7 +83,7 @@ export async function renderCore(view) {
                 <input type="checkbox" value="${e.id}" ${choice.ids.includes(e.id) ? "checked" : ""} />
                 <span class="list-row-text">
                   <strong>${esc(e.name)}${favorites.exercises.includes(e.id) ? `<span class="mark-fav" aria-label="${t("core.favorite")}">${icons.starFilled}</span>` : ""}${favorites.disliked.includes(e.id) ? `<span class="mark-dislike" aria-label="${t("core.disliked")}">${icons.thumbDownFilled}</span>` : ""}</strong>
-                  <small>${e.primary.map(muscleName).join(", ")}${e.timed ? ` · ${t("core.hold")}` : ""}</small>
+                  <small>${e.primary.map(muscleName).join(", ")}${e.timed ? ` · ${t("core.hold")}` : ""}${e.equipment !== "peso_corporal" ? ` · ${equipmentName(e.equipment)}` : ""}</small>
                 </span>
               </label>
               <button class="icon-btn" type="button" data-action="howto" data-id="${e.id}" aria-label="${t("core.howTo", { name: esc(e.name) })}">${icons.info}</button>

@@ -2493,3 +2493,29 @@ body.has-resume-bar .bottom-bar.above-tabs {
 .add-list {
   margin-top: var(--space-3);
 }
+
+/* ---------- Temporizador de descanso ---------- */
+
+.bottom-bar-stack {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.bottom-bar-stack > * {
+  width: 100%;
+  max-width: 512px;
+}
+
+body.focus-mode .view:has(.bottom-bar-stack) {
+  padding-bottom: calc(180px + env(safe-area-inset-bottom));
+}
+
+.rest-btn {
+  --rest-progress: 0%;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Mientras corre, el botón se va llenando de verde. */
+.rest-btn.running {
+  background: linear-gradient(90deg, var(--color-success-soft) var(--rest-progress), var(--color-surface-2) var(--rest-progress));
+}

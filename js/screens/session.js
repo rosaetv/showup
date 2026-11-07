@@ -5,7 +5,7 @@ import {
   getLastPerformance, getExerciseHistory, getAllExercises, getNotes, getPlan, savePlan, getProfile, getFavorites,
 } from "../store.js";
 import { getPeriods, activePeriod } from "../period.js";
-import { blocks, pairRest } from "../supersets.js";
+import { blocks, pairRest, applyPairs } from "../supersets.js";
 import { bestMarks, sessionRecord } from "../records.js";
 import { checkGoals } from "../goals.js";
 import { CORE_DIY_REST } from "../data/core-diy.js";
@@ -143,6 +143,7 @@ export async function renderSession(view) {
   draw();
 
   const save = () => saveActiveWorkout(active);
+  if (active.restEndsAt && !restTimer.endsAt) resumeRest(active);
 
   view.oninput = (event) => {
     const input = event.target.closest(".set-input");
@@ -177,6 +178,7 @@ export async function renderSession(view) {
         set.weight = weight;
         set.reps = reps;
         set.done = true;
+        active.lastEi = ei; // el descanso se calcula con este ejercicio
       }
       document.activeElement?.blur();
       await save();
@@ -256,6 +258,10 @@ export async function renderSession(view) {
       );
     } else if (action === "finish") {
       await finish(active, byId);
+    } else if (action === "rest") {
+      if (restTimer.endsAt) stopRest(active);
+      else startRest(active, restSeconds(active));
+      await save();
     } else if (action === "discard") {
       const ok = await confirmSheet({
         title: t("session.discardTitle"),
@@ -264,6 +270,7 @@ export async function renderSession(view) {
         danger: true,
       });
       if (!ok) return;
+      stopRest(active);
       await clearActiveWorkout();
       toast(t("session.discarded"));
       location.hash = "#/entrenar";
@@ -382,7 +389,8 @@ function template(active, byId, last, notes, bests, units) {
     ${cards}
     ${active.extra ? "" : `<button class="btn btn-secondary btn-spaced" data-action="add-exercise">${icons.plus} ${t("session.addToday")}</button>`}
     <button class="btn btn-ghost-danger btn-spaced" data-action="discard">${t("session.discard")}</button>
-    <div class="bottom-bar">
+    <div class="bottom-bar bottom-bar-stack">
+      <button class="btn btn-secondary rest-btn" data-action="rest">${restLabel(active)}</button>
       <button class="btn btn-primary" data-action="finish">${t("session.finish")}</button>
     </div>
   `;
@@ -465,6 +473,21 @@ async function finish(active, byId) {
     confirmLabel: t("session.finishConfirm"),
   });
   if (!ok) return;
+  stopRest(active);
+
+  // Ejercicios que agregaste hoy: ¿se quedan en tu plan o fueron solo esta vez?
+  const plan = active.extra ? null : await getPlan();
+  const day = plan?.days[active.dayIndex];
+  const tried = active.exercises.filter((e) => e.added && e.sets.some((x) => x.done) && !day?.items.some((i) => i.exerciseId === e.exerciseId));
+  if (day && tried.length) {
+    const keep = await askKeepInPlan(tried, byId, day, active.dayIndex);
+    if (keep.length) {
+      for (const e of keep) addToPlanDay(plan, active.dayIndex, byId(e.exerciseId), byId);
+      for (const e of keep) delete e.added; // ya es parte de tu rutina
+      await savePlan(plan);
+      toast(t("session.keptInPlan", { n: keep.length }));
+    }
+  }
 
   // Récords de hoy (contra todo lo anterior).
   const records = new Set();
@@ -504,10 +527,10 @@ async function finish(active, byId) {
   });
 
   // La rotación sigue con el día siguiente al que acabas de hacer.
-  const plan = await getPlan();
-  if (plan && !active.extra) {
-    plan.nextDay = (active.dayIndex + 1) % plan.days.length;
-    await savePlan(plan);
+  const current = await getPlan();
+  if (current && !active.extra) {
+    current.nextDay = (active.dayIndex + 1) % current.days.length;
+    await savePlan(current);
   }
   await clearActiveWorkout();
   toast(records.size ? t("session.savedRecords", { n: records.size }) : t("session.saved"));
@@ -525,6 +548,174 @@ function asWorkout(active) {
       sets: e.sets.filter((s) => s.done).map((s) => ({ weight: toKg(toNumber(s.weight) || 0, e.unit || "kg"), reps: toNumber(s.reps) })),
     })),
   };
+}
+
+// ---------- Temporizador de descanso ----------
+// Cuenta con la hora de fin (no con un contador), así no se desfasa si el
+// teléfono pausa la página. Al terminar suena un "ding" corto.
+// En el iPhone, con el modo silencio activado, el sonido puede no oírse.
+
+const restTimer = { endsAt: 0, interval: 0, audio: null };
+
+// Descanso del último ejercicio que marcaste (en superseries y circuito, el de la pareja o la vuelta).
+function restSeconds(active) {
+  const ei = active.lastEi ?? Math.max(0, active.exercises.findIndex((e) => e.sets.some((x) => !x.done)));
+  const entry = active.exercises[ei];
+  if (!entry) return 90;
+  if (entry.group) return pairRest(active.exercises.filter((e) => e.group === entry.group));
+  return entry.rest || 90;
+}
+
+const clock = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+
+function restLabel(active) {
+  const left = Math.ceil((restTimer.endsAt - Date.now()) / 1000);
+  if (restTimer.endsAt && left > 0) return t("rest.running", { time: clock(left) });
+  return t("rest.start", { time: clock(restSeconds(active)) });
+}
+
+function updateRestButton(active, text) {
+  const button = document.querySelector(".rest-btn");
+  if (!button) return;
+  button.textContent = text || restLabel(active);
+  button.classList.toggle("running", Boolean(restTimer.endsAt));
+  const total = restTimer.total || 1;
+  const left = Math.max(0, restTimer.endsAt - Date.now());
+  button.style.setProperty("--rest-progress", restTimer.endsAt ? `${100 - (left / total) * 100}%` : "0%");
+}
+
+function startRest(active, seconds) {
+  unlockAudio(); // en el iPhone el sonido solo se permite si se prepara con un toque
+  restTimer.total = seconds * 1000;
+  restTimer.endsAt = Date.now() + restTimer.total;
+  active.restEndsAt = restTimer.endsAt;
+  active.restTotal = restTimer.total;
+  tick(active);
+}
+
+function resumeRest(active) {
+  restTimer.total = active.restTotal || 90000;
+  restTimer.endsAt = active.restEndsAt;
+  tick(active);
+}
+
+function tick(active) {
+  clearInterval(restTimer.interval);
+  const step = () => {
+    if (Date.now() >= restTimer.endsAt) {
+      const late = Date.now() - restTimer.endsAt > 5000; // la app estaba en segundo plano
+      stopRest(active);
+      saveActiveWorkout(active);
+      if (!late) ding();
+      updateRestButton(active, t("rest.done"));
+      toast(t("rest.doneToast"));
+      setTimeout(() => updateRestButton(active), 3000);
+      return;
+    }
+    updateRestButton(active);
+  };
+  restTimer.interval = setInterval(step, 250);
+  step();
+}
+
+function stopRest(active) {
+  clearInterval(restTimer.interval);
+  restTimer.endsAt = 0;
+  delete active.restEndsAt;
+  delete active.restTotal;
+  updateRestButton(active);
+}
+
+function unlockAudio() {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return;
+  // "ambient": suena junto con tu música en lugar de pausarla.
+  if (navigator.audioSession) navigator.audioSession.type = "ambient";
+  restTimer.audio ||= new AudioContext();
+  restTimer.audio.resume?.();
+}
+
+// Dos notas cortas que se desvanecen: discreto pero se nota.
+function ding() {
+  const ctx = restTimer.audio;
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  [[880, 0], [1320, 0.16]].forEach(([frequency, delay]) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.0001, now + delay);
+    gain.gain.exponentialRampToValueAtTime(0.35, now + delay + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.9);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(now + delay);
+    osc.stop(now + delay + 1);
+  });
+}
+
+// ---------- Ejercicios agregados: ¿al plan o solo hoy? ----------
+
+function askKeepInPlan(tried, byId, day, dayIndex) {
+  return new Promise((resolve) => {
+    let answered = false;
+    const one = tried.length === 1;
+    const close = openSheet({
+      title: one ? t("session.keepTitleOne", { name: byId(tried[0].exerciseId)?.name || "" }) : t("session.keepTitle"),
+      body: `
+        <p class="sheet-text">${t("session.keepText", { day: `${t("common.dayN", { n: dayIndex + 1 })} · ${esc(dayLabel(day))}` })}</p>
+        ${one ? "" : `
+        <div class="check-list">
+          ${tried
+            .map(
+              (e) => `
+            <label class="check-row">
+              <input type="checkbox" value="${e.exerciseId}" checked />
+              <span><strong>${esc(byId(e.exerciseId)?.name || "")}</strong></span>
+            </label>`
+            )
+            .join("")}
+        </div>`}
+        <div class="stack">
+          <button class="btn btn-primary" data-keep>${t("session.keepYes")}</button>
+          <button class="btn btn-secondary" data-once>${t("session.keepNo")}</button>
+        </div>`,
+      onMount: (sheet) => {
+        const finishWith = (list) => {
+          answered = true;
+          close();
+          resolve(list);
+        };
+        sheet.querySelector("[data-keep]").onclick = () => {
+          const chosen = one ? tried : tried.filter((e) => sheet.querySelector(`input[value="${e.exerciseId}"]`)?.checked);
+          finishWith(chosen);
+        };
+        sheet.querySelector("[data-once]").onclick = () => finishWith([]);
+      },
+    });
+    // Si se cierra sin responder, cuenta como "solo hoy".
+    const observer = new MutationObserver(() => {
+      if (!document.querySelector(".sheet-backdrop")) {
+        observer.disconnect();
+        if (!answered) resolve([]);
+      }
+    });
+    observer.observe(document.body, { childList: true });
+  });
+}
+
+// Suma el ejercicio a ese día del plan, antes del cierre (core y tobillo).
+function addToPlanDay(plan, dayIndex, exercise, byId) {
+  const day = plan.days[dayIndex];
+  if (!exercise || day.items.some((i) => i.exerciseId === exercise.id)) return;
+  const at = day.items.findIndex((i) => i.finisher);
+  const position = at === -1 ? day.items.length : at;
+  day.items.splice(position, 0, makeItem(exercise, plan.goal, position, plan));
+  if (day.superset) {
+    // Con superseries, se vuelve a armar las parejas con el ejercicio nuevo.
+    day.originalOrder?.splice(Math.min(position, day.originalOrder.length), 0, exercise.id);
+    applyPairs(day, byId);
+  }
 }
 
 // ---------- Agregar un ejercicio solo por hoy ----------

@@ -5,7 +5,7 @@
 export const CARE_ZONES = {
   rodillas: [
     "sentadilla-barra", "sentadilla-frontal", "sentadilla-hack", "sentadilla-smith",
-    "zancadas-mancuernas", "sentadilla-bulgara", "step-up", "zancada-smith",
+    "zancadas-mancuernas", "sentadilla-bulgara", "step-up", "zancada-smith", "zancada-giro",
     "extension-cuadriceps", "curl-nordico",
   ],
   espalda_baja: [
@@ -18,7 +18,7 @@ export const CARE_ZONES = {
   ],
   // Tobillos: además de evitar estos, el plan suma un ejercicio corto para fortalecerlos cada día.
   tobillos: [
-    "zancadas-mancuernas", "sentadilla-bulgara", "step-up", "zancada-smith",
+    "zancadas-mancuernas", "sentadilla-bulgara", "step-up", "zancada-smith", "zancada-giro", "crossbody-crunch-pie",
   ],
   munecas: [
     "flexiones", "press-frances", "curl-barra", "press-cerrado", "fondos-banco", "press-banca", "press-militar",

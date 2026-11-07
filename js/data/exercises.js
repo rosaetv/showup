@@ -783,6 +783,43 @@ export const EXERCISES = [
     tip: "Hazlo despacio si te molesta el tobillo: cuenta igual.",
   },
 
+  // Core con mancuerna
+  {
+    id: "wind-wipers", name: "Wind wipers", equipment: "mancuernas", pattern: "core",
+    primary: ["oblicuos", "abdomen"], secondary: ["hombro_frontal", "gluteos"],
+    description: "De rodillas, con los brazos estirados al frente sosteniendo una mancuerna, moverla de lado a lado sin girar la cadera.",
+    steps: ["De rodillas y con el torso erguido, sostén una mancuerna con las dos manos y los brazos estirados al frente.", "Lleva la mancuerna hacia un lado, en arco, como un limpiaparabrisas.", "Pasa al otro lado con control. Cada lado cuenta como una repetición."],
+    tip: "La cadera mira siempre al frente: el trabajo es no dejar que gire. Empieza con poco peso.",
+  },
+  {
+    id: "bear-plank-slides", name: "Bear plank slides", equipment: "mancuernas", pattern: "core",
+    primary: ["abdomen", "oblicuos"], secondary: ["hombro_frontal", "cuadriceps"],
+    description: "En bear plank, con las rodillas despegadas del suelo, deslizar una mancuerna por el suelo con una mano sin mover la cadera.",
+    steps: ["En cuatro apoyos, despega las rodillas un par de centímetros, con una mancuerna en el suelo bajo el cuerpo.", "Con una mano, desliza la mancuerna por el suelo sin levantarla.", "Cambia de mano y regrésala. Cada lado cuenta como una repetición."],
+    tip: "La espalda queda plana y la cadera no se balancea. Si se mueve, usa menos peso.",
+  },
+  {
+    id: "puente-marcha", name: "Puente de glúteo con marcha", equipment: "mancuernas", pattern: "core",
+    primary: ["gluteos", "abdomen"], secondary: ["isquios", "oblicuos"],
+    description: "En puente de glúteo, con una mancuerna arriba del pecho, levantar una rodilla y luego la otra sin que baje la cadera.",
+    steps: ["Boca arriba, sube a puente de glúteo con una mancuerna sostenida arriba del pecho, brazos estirados.", "Levanta una rodilla hacia el pecho sin que la cadera baje ni se incline.", "Baja el pie y cambia de pierna. Cada lado cuenta como una repetición."],
+    tip: "Mantén la cadera alta y nivelada. Se puede hacer sin mancuerna.",
+  },
+  {
+    id: "crossbody-crunch-pie", name: "Crossbody crunch de pie", equipment: "mancuernas", pattern: "core",
+    primary: ["oblicuos", "abdomen"], secondary: ["hombro_frontal"],
+    description: "De pie, con una mancuerna en cada mano, llevar la rodilla hacia el codo contrario.",
+    steps: ["De pie, una mancuerna en cada mano, con una a la altura del hombro y la otra abajo.", "Sube la rodilla contraria mientras acercas a ella el codo de la mancuerna alta.", "Baja con control. Haz todas y cambia de lado."],
+    tip: "Te sostienes en una pierna: junto a una pared si el tobillo no se siente firme. Si duele, para.",
+  },
+  {
+    id: "zancada-giro", name: "Zancada con giro", equipment: "mancuernas", pattern: "core",
+    primary: ["oblicuos"], secondary: ["cuadriceps", "gluteos", "abdomen"],
+    description: "En zancada, con una mancuerna frente al pecho, girar el torso hacia la pierna de adelante.",
+    steps: ["Da un paso largo y baja a zancada, con una mancuerna sostenida con las dos manos frente al pecho.", "Gira el torso hacia la pierna de adelante, con los brazos al frente.", "Regresa al centro, sube y cambia de pierna."],
+    tip: "El giro sale del torso; la rodilla de adelante no se mueve hacia adentro. Si te cuesta el equilibrio, hazla sin peso o sin dar el paso.",
+  },
+
   // ---------- Tobillos ----------
   // Para fortalecer el tobillo (por ejemplo, después de un esguince). Si duele, para.
   {
